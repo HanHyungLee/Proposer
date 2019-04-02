@@ -15,7 +15,7 @@ Pod::Spec.new do |s|
   s.authors           = { "nixzhu" => "zhuhongxu@gmail.com" }
   s.social_media_url  = "https://twitter.com/nixzhu"
 
-  s.ios.deployment_target   = "8.0"
+  s.ios.deployment_target   = "10.0"
 
   s.source          = { :git => "https://github.com/nixzhu/Proposer.git", :tag => s.version }
   s.source_files    = "Proposer/*.swift"
