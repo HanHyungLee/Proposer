@@ -9,9 +9,7 @@ Proposer provides a single API to request permission for access **Camera**, **Ph
 
 ## Requirements
 
-Swift 4.2, iOS 9.0
-
-(Swift 3, use version 1.1.0)
+Swift 5, iOS 10.0
 
 ## Example
 
