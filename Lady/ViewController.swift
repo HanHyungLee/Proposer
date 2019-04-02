@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import UserNotifications
 import Proposer
 
 class ViewController: UIViewController {
@@ -106,11 +107,13 @@ class ViewController: UIViewController {
     }
 
     @IBAction func sendNotifications() {
-        let settings = UIUserNotificationSettings(
-            types: [.alert, .badge, .sound],
-            categories: nil
-        )
-        let notifications: PrivateResource = .notifications(settings)
+        let options: UNAuthorizationOptions
+        if #available(iOS 12.0, *) {
+            options = [.provisional, .alert, .badge, .sound]
+        } else {
+            options = [.alert, .badge, .sound]
+        }
+        let notifications: PrivateResource = .notifications(options)
         let propose: Propose = {
             proposeToAccess(notifications, agreed: {
                 print("I can send Notifications. :]\n")

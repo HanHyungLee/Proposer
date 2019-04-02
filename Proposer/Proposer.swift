@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import UserNotifications
 import AVFoundation
 import Photos
 import AddressBook
@@ -26,8 +27,8 @@ public enum PrivateResource {
         case always
     }
     case location(LocationUsage)
-    case notifications(UIUserNotificationSettings)
-
+    case notifications(UNAuthorizationOptions)
+    
     public var isNotDeterminedAuthorization: Bool {
         switch self {
         case .photos:
@@ -37,7 +38,7 @@ public enum PrivateResource {
         case .microphone:
             return AVAudioSession.sharedInstance().recordPermission == .undetermined
         case .contacts:
-            return ABAddressBookGetAuthorizationStatus() == .notDetermined
+            return CNContactStore.authorizationStatus(for: .contacts) == .notDetermined
         case .reminders:
             return EKEventStore.authorizationStatus(for: .reminder) == .notDetermined
         case .calendar:
@@ -58,7 +59,7 @@ public enum PrivateResource {
         case .microphone:
             return AVAudioSession.sharedInstance().recordPermission == .granted
         case .contacts:
-            return ABAddressBookGetAuthorizationStatus() == .authorized
+            return CNContactStore.authorizationStatus(for: .contacts) == .authorized
         case .reminders:
             return EKEventStore.authorizationStatus(for: .reminder) == .authorized
         case .calendar:
@@ -95,8 +96,8 @@ public func proposeToAccess(_ resource: PrivateResource, agreed successAction: @
         proposeToAccessEventForEntityType(.event, agreed: successAction, rejected: failureAction)
     case .location(let usage):
         proposeToAccessLocation(usage, agreed: successAction, rejected: failureAction)
-    case .notifications(let settings):
-        proposeToSendNotifications(settings, agreed: successAction, rejected: failureAction)
+    case .notifications(let options):
+        proposeToSendNotifications(options, agreed: successAction, rejected: failureAction)
     }
 }
 
@@ -222,7 +223,7 @@ private func proposeToAccessLocation(_ locationUsage: PrivateResource.LocationUs
     }
 }
 
-private func proposeToSendNotifications(_ settings: UIUserNotificationSettings, agreed successAction: @escaping ProposerAction, rejected failureAction: @escaping ProposerAction) {
+private func proposeToSendNotifications(_ options: UNAuthorizationOptions, agreed successAction: @escaping ProposerAction, rejected failureAction: @escaping ProposerAction) {
     switch UIApplication.shared.notificationAuthorizationStatus {
     case .notDetermined:
         let notificationMan = NotificationMan {
@@ -233,9 +234,16 @@ private func proposeToSendNotifications(_ settings: UIUserNotificationSettings, 
             }
         }
         _notificationMan = notificationMan
-        UIApplication.shared.registerUserNotificationSettings(settings)
+        
+        UNUserNotificationCenter.current().requestAuthorization(options: options) { granted, error in
+            if granted == true {
+                successAction()
+            }
+            else {
+                failureAction()
+            }
+        }
     case .authorized:
-        UIApplication.shared.registerUserNotificationSettings(settings)
         successAction()
     case .denied:
         failureAction()
@@ -293,11 +301,28 @@ private extension UIApplication {
     }
 
     var notificationAuthorizationStatus: NotificationAuthorizationStatus {
-        if UIApplication.shared.currentUserNotificationSettings?.types.isEmpty == false {
-            return .authorized
+        var status: NotificationAuthorizationStatus = .notDetermined
+        let semaphore = DispatchSemaphore(value: 0)
+        let current = UNUserNotificationCenter.current()
+        
+        current.getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .authorized, .provisional:
+                status = .authorized
+            case .denied:
+                status = .denied
+            case .notDetermined:
+                status = .notDetermined
+            @unknown default:
+                status = .notDetermined
+            }
+            semaphore.signal()
         }
-        let asked = UserDefaults.standard.bool(forKey: askedForNotificationPermissionKey)
-        return asked ? .denied : .notDetermined
+        _ = semaphore.wait(timeout: .now() + 5.0)
+        
+        return status
+//        let asked = UserDefaults.standard.bool(forKey: askedForNotificationPermissionKey)
+//        return asked ? .denied : .notDetermined
     }
 }
 
